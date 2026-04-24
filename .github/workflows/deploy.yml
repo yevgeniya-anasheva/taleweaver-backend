@@ -16,7 +16,7 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-        aws-region: eu-west-1
+        aws-region: eu-east-1
 
     - uses: aws-actions/amazon-ecr-login@v2
 
@@ -33,7 +33,7 @@ jobs:
         username: ec2-user
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          aws ecr get-login-password --region eu-west-1 | \
+          aws ecr get-login-password --region eu-east-1 | \
             docker login --username AWS \
             --password-stdin ${{ secrets.ECR_BACKEND }}
           docker-compose pull backend
