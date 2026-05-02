@@ -3,12 +3,12 @@ import math
 
 
 def _distance(pos1, pos2):
-    """Euclidean distance between two (x, y) positions."""
+    # Euclidean distance between two (x, y) positions
     return math.sqrt((pos1[0] - pos2[0]) ** 2 + (pos1[1] - pos2[1]) ** 2)
 
 
 def _ensure_positions(players, enemies):
-    """Ensure every participant has a position (for AOE/range). Assign defaults if missing."""
+    # Ensure every participant has a position (for AOE/range)
     for i, p in enumerate(players):
         if "position" not in p or p["position"] is None:
             p["position"] = (0, i)  # Row of players at x=0
@@ -18,7 +18,7 @@ def _ensure_positions(players, enemies):
 
 
 def _get_players_in_radius(attacker_pos, players, radius):
-    """Return list of living players within given radius of attacker. radius 0 = single-target (return up to 1)."""
+    # Return list of living players within given radius of attacker. radius 0 = single target
     alive = [p for p in players if p.get("hp", 0) > 0]
     if radius == 0:
         return alive[:1]  # Single target: first alive (could be refined to "closest")
@@ -27,7 +27,7 @@ def _get_players_in_radius(attacker_pos, players, radius):
 
 
 def _get_all_abilities(actor):
-    """Return flat list of all abilities (melee + ranged) with attackType, baseDamage, radius."""
+    # Return flat list of all abilities (melee + ranged) with attackType, baseDamage, radius
     abilities = []
     for atype in ("melee", "ranged"):
         for a in actor.get("abilities", {}).get(atype, []):
@@ -47,7 +47,7 @@ class Attack:
         self.radius = radius  # 0 = single target, >0 = AOE (max distance in tiles)
 
     def perform_attack(self, attacker, target, saved_bonus=0):
-        # 1. Roll d20
+        # Roll d20
         roll = random.randint(1, 20)
         total_hit_roll = roll + self.accuracy_mod + saved_bonus
 
@@ -55,7 +55,7 @@ class Attack:
         print(
             f"Roll: {roll} + Mod: {self.accuracy_mod} + Bonus: {saved_bonus} = {total_hit_roll} vs AC: {target['ac']}")
 
-        # 2. Compare to Target AC
+        # Compare to Target AC
         if total_hit_roll >= target['ac']:
             damage_dealt = self.damage + random.randint(0, 3)
             target['hp'] -= damage_dealt
@@ -66,7 +66,7 @@ class Attack:
             return False
 
     def perform_attack_aoe(self, attacker, targets, saved_bonus=0):
-        """Perform this attack against multiple targets (each rolls separately). Returns total damage dealt."""
+        # Perform this attack against multiple targets, returns total damage dealt
         total_damage = 0
         for target in targets:
             if target['hp'] <= 0:
@@ -96,8 +96,8 @@ def calculate_ac(char):
 def _choose_ai_ability(enemy, players):
     """
     Choose which ability the AI uses this turn.
-    First priority: AOE that can hit multiple players and yields NET more damage than best single-target.
-    Second priority: highest total damage (single or AOE).
+    First priority: AOE that can hit multiple players and yields NET more damage than single target
+    Second priority: highest total damage (single or AOE)
     """
     alive_players = [p for p in players if p.get("hp", 0) > 0]
     if not alive_players:
@@ -131,7 +131,7 @@ def _choose_ai_ability(enemy, players):
     if not options:
         return None, []
 
-    # First priority: AOE that hits multiple and has NET more expected damage than best single-target
+    # First priority: AOE that hits multiple and has NET more expected damage than single target
     single_target_options = [(e, d, ab, t, aoe) for (e, d, ab, t, aoe) in options if not aoe]
     best_single_expected = max((e for e, _, _, _, _ in single_target_options), default=0)
     best_single_total = max((d for e, d, _, _, aoe in options if not aoe), default=0)
@@ -147,7 +147,7 @@ def _choose_ai_ability(enemy, players):
 
 
 def start_combat(player, enemies):
-    # Normalize to list of players (support single player or multiple)
+    # Normalize to list of players
     players = player if isinstance(player, list) else [player]
     _ensure_positions(players, enemies)
 
@@ -165,7 +165,7 @@ def start_combat(player, enemies):
         round_num += 1
         print(f"=== ROUND {round_num} ===\n")
 
-        # --- PLAYER TURNS (each player gets one turn) ---
+        # Player turn (1 turn per player)
         for actor in alive_players:
             if actor['hp'] <= 0:
                 continue
@@ -205,7 +205,7 @@ def start_combat(player, enemies):
             print("\nAll enemies defeated!")
             break
 
-        # --- ENEMY TURNS (each enemy gets one turn) ---
+        # Enemy turn (1 turn per enemy)
         for enemy in list(enemies):
             if enemy['hp'] <= 0:
                 continue
