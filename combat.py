@@ -2,12 +2,12 @@ import random
 import math
 
 
-def _distance(pos1, pos2):
+def distance(pos1, pos2):
     # Euclidean distance between two (x, y) positions
     return math.sqrt((pos1[0] - pos2[0]) ** 2 + (pos1[1] - pos2[1]) ** 2)
 
 
-def _ensure_positions(players, enemies):
+def ensure_positions(players, enemies):
     # Ensure every participant has a position (for AOE/range)
     for i, p in enumerate(players):
         if "position" not in p or p["position"] is None:
@@ -17,16 +17,16 @@ def _ensure_positions(players, enemies):
             e["position"] = (2, i)  # Enemies at x=2
 
 
-def _get_players_in_radius(attacker_pos, players, radius):
+def get_players_in_radius(attacker_pos, players, radius):
     # Return list of living players within given radius of attacker. radius 0 = single target
     alive = [p for p in players if p.get("hp", 0) > 0]
     if radius == 0:
         return alive[:1]  # Single target: first alive (could be refined to "closest")
-    in_range = [p for p in alive if _distance(attacker_pos, p.get("position", (0, 0))) <= radius]
+    in_range = [p for p in alive if distance(attacker_pos, p.get("position", (0, 0))) <= radius]
     return in_range
 
 
-def _get_all_abilities(actor):
+def get_all_abilities(actor):
     # Return flat list of all abilities (melee + ranged) with attackType, baseDamage, radius
     abilities = []
     for atype in ("melee", "ranged"):
@@ -93,18 +93,18 @@ def calculate_ac(char):
     return 10 + get_modifier(char['stats']['con'])
 
 
-def _choose_ai_ability(enemy, players):
+def choose_ai_ability(enemy, players):
     """
     Choose which ability the AI uses this turn.
     First priority: AOE that can hit multiple players and yields NET more damage than single target
-    Second priority: highest total damage (single or AOE)
+    Second priority: highest total damage
     """
     alive_players = [p for p in players if p.get("hp", 0) > 0]
     if not alive_players:
         return None, []
 
     pos = enemy.get("position", (0, 0))
-    abilities = _get_all_abilities(enemy)
+    abilities = get_all_abilities(enemy)
     if not abilities:
         return None, []
 
@@ -119,7 +119,7 @@ def _choose_ai_ability(enemy, players):
     for ab in abilities:
         radius = ab.get("radius", 0)
         damage = ab.get("baseDamage", 0)
-        targets = _get_players_in_radius(pos, alive_players, radius)
+        targets = get_players_in_radius(pos, alive_players, radius)
         if not targets:
             continue
         # Expected damage: assume 50% hit chance for simplicity, or use (21 - avg_ac)/20
@@ -149,7 +149,7 @@ def _choose_ai_ability(enemy, players):
 def start_combat(player, enemies):
     # Normalize to list of players
     players = player if isinstance(player, list) else [player]
-    _ensure_positions(players, enemies)
+    ensure_positions(players, enemies)
 
     print(enemies)
 
@@ -209,7 +209,7 @@ def start_combat(player, enemies):
         for enemy in list(enemies):
             if enemy['hp'] <= 0:
                 continue
-            ab, targets = _choose_ai_ability(enemy, players)
+            ab, targets = choose_ai_ability(enemy, players)
             if not ab or not targets:
                 continue
             mod = get_modifier(enemy['stats']['dex']) if ab.get('attackType') == 'ranged' else get_modifier(enemy['stats']['str'])
