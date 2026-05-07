@@ -43,6 +43,10 @@ def generate_perlin_terrain(width=DEFAULT_WORLD_WIDTH, height=DEFAULT_WORLD_HEIG
     cutoffs = []
     running = lo
     for terrain, weight in TERRAIN_LEVELS:
+        # span = hi - lo
+        # water cutoff = lo + span * 0.20
+        # grass cutoff = lo + span * 0.45
+        # forest cutoff = lo + span * 0.35
         running += (hi - lo) * (weight / total_weight)
         cutoffs.append((terrain, running))
     # Make sure the last band always catches the maximum value
