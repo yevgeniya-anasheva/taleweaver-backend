@@ -11,7 +11,7 @@ import random
 from combat import Attack, start_combat
 from map import generate_complex_map
 
-# === Load API key ===
+# Load API key 
 load_dotenv()
 api_key = os.getenv("API_KEY")
 
@@ -27,75 +27,36 @@ WALKABLE_TILE_TYPES = {"grass", "forest"}
 rooms = {}
 
 
-def visualize_map(grid):
-    COLORS = {
-        "water": "\033[94m", "grass": "\033[92m", "forest": "\033[32m",
-        "mountain": "\033[90m", "building": "\033[93m", "reset": "\033[0m"
-    }
-    # Using dots for grass and letters for others
-    CHARS = {"water": "W", "grass": ".", "forest": "F", "mountain": "M", "building": "█"}
-
-    print("\n--- Map ---")
-    for row in grid:
-        for tile in row:
-            color = COLORS.get(tile['type'], "")
-            char = CHARS.get(tile['type'], "?")
-
-            if tile['door'] == "left":
-                display = f"|{char}"
-            elif tile['door'] == "right":
-                display = f"{char}|"
-            elif tile['door'] == "top":
-                display = f"¯{char}"
-            elif tile['door'] == "bottom":
-                display = f"_{char}"
-            else:
-                display = f" {char} "
-
-            print(f"{color}{display}{COLORS['reset']}", end="")
-        print()
-
-
-# === Viewport helpers ===
-
+# Viewport helpers
 def is_walkable(tile):
-    """Tiles a player can step onto."""
+    # Tiles a player can step on
     if not tile:
         return False
     return tile.get("type") in WALKABLE_TILE_TYPES
 
-
-_DIRECTION_DELTAS = {
+DIRECTION_DELTAS = {
     "up": (0, -1),
     "down": (0, 1),
     "left": (-1, 0),
     "right": (1, 0),
-    "north": (0, -1),
-    "south": (0, 1),
-    "west": (-1, 0),
-    "east": (1, 0),
 }
-
 
 def direction_to_delta(direction):
     if direction is None:
         return None
-    return _DIRECTION_DELTAS.get(str(direction).lower())
+    return DIRECTION_DELTAS.get(str(direction).lower())
 
 
 def get_viewport(player_positions, world_map, world_width, world_height, view_size=VIEW_SIZE):
-    """Return a view_size x view_size slice of the world centered on the players' average position.
+    # Return a view_size x view_size slice of the world centered on the players' average position
 
-    Returns:
-        (tiles, (start_x, start_y)) where `tiles` is a flat list of tile dicts
-        annotated with rel_x/rel_y (viewport coords) and world_x/world_y (global coords).
-    """
     positions = list(player_positions.values()) if isinstance(player_positions, dict) else list(player_positions)
 
     if positions:
         avg_x = sum(p["x"] for p in positions) / len(positions)
         avg_y = sum(p["y"] for p in positions) / len(positions)
     else:
+        # if no player positions, center the viewport on the world's center
         avg_x = world_width / 2
         avg_y = world_height / 2
 
@@ -103,6 +64,10 @@ def get_viewport(player_positions, world_map, world_width, world_height, view_si
     start_y = int(avg_y - view_size / 2)
 
     # Clamp so the viewport never reads outside the world bounds
+    # world with 50, view size 10, so start_x is 0-40 and start_y is 0-40
+    # if value < 0 return 0
+    # if value >= 0 or value <= 40 return value
+    # if value > 40 return 40
     start_x = max(0, min(start_x, world_width - view_size))
     start_y = max(0, min(start_y, world_height - view_size))
 
@@ -120,11 +85,12 @@ def get_viewport(player_positions, world_map, world_width, world_height, view_si
 
 
 def is_move_allowed(moving_player_id, new_coords, all_players, max_distance=LEASH_DISTANCE):
-    """Reject moves that would stretch the group past the leash distance."""
+    # Reject moves that would stretch the group past the leash distance
     nx, ny = new_coords
     for pid, pos in all_players.items():
         if pid == moving_player_id:
             continue
+        # d = sqrt((x2 - x1)^2 + (y2 - y1)^2))
         dist = math.sqrt((nx - pos["x"]) ** 2 + (ny - pos["y"]) ** 2)
         if dist > max_distance:
             return False
@@ -133,11 +99,8 @@ def is_move_allowed(moving_player_id, new_coords, all_players, max_distance=LEAS
 
 def compute_reachable_tiles(world_map, world_width, world_height, start,
                               max_steps=MAX_MOVE_STEP, blocked_positions=()):
-    """8-direction BFS from `start` (a (x, y) tuple).
-
-    Returns a dict mapping each reachable (x, y) -> step count. Tiles that
-    aren't walkable, are blocked by another player, or out of bounds are
-    treated as obstacles. The starting tile itself is omitted from the result.
+    """Tiles that aren't walkable, are blocked by another player, or out of bounds are
+    treated as obstacles. The starting tile itself is omitted
     """
     sx, sy = start
     blocked = set(blocked_positions)
@@ -171,7 +134,7 @@ def compute_reachable_tiles(world_map, world_width, world_height, start,
 
 def find_spawn_position(world_map, world_width, world_height, player_positions,
                          view_size=VIEW_SIZE, max_distance=LEASH_DISTANCE):
-    """Pick a walkable, unoccupied spawn that respects the leash."""
+    # Pick a walkable, unoccupied spawn that respects the leash
     occupied = {(p["x"], p["y"]) for p in player_positions.values()}
 
     if player_positions:
@@ -216,7 +179,7 @@ def find_spawn_position(world_map, world_width, world_height, player_positions,
 
 
 def build_world_state_message(room):
-    """Build the world_state payload to broadcast to clients in `room`."""
+    # Build the world_state payload to broadcast to clients in selected room
     tiles, (start_x, start_y) = get_viewport(
         room["player_positions"],
         room["world_map"],
@@ -248,7 +211,7 @@ async def broadcast_world_state(room_id):
 
 
 # Each enemy has 3 random abilities: melee or ranged, with baseDamage and radius (0 = single target, >0 = AOE)
-def _random_ability(attack_type):
+def random_ability(attack_type):
     names_melee = ["Stab", "Slash", "Bite", "Claw", "Slam", "Cleave", "Strike"]
     names_ranged = ["Throw", "Shot", "Spit", "Bolt", "Blast", "Barrage"]
     names = names_melee if attack_type == "melee" else names_ranged
@@ -259,24 +222,24 @@ def _random_ability(attack_type):
         "attackType": attack_type,
     }
 
-def _enemy_abilities():
+def enemy_abilities():
     abilities = []
     for _ in range(3):
-        abilities.append(_random_ability(random.choice(["melee", "ranged"])))
+        abilities.append(random_ability(random.choice(["melee", "ranged"])))
     return {"melee": [a for a in abilities if a["attackType"] == "melee"], "ranged": [a for a in abilities if a["attackType"] == "ranged"]}
 
 enemy_pool = [
-    {"race": "Goblin", "hp": 7, "ac": 12, "stats": {"str": 8, "dex": 14, "con": 10}, "abilities": _enemy_abilities()},
-    {"race": "Skeleton", "hp": 10, "ac": 13, "stats": {"str": 10, "dex": 14, "con": 15}, "abilities": _enemy_abilities()},
-    {"race": "Kobold", "hp": 5, "ac": 11, "stats": {"str": 7, "dex": 15, "con": 9}, "abilities": _enemy_abilities()},
-    {"race": "Orc", "hp": 15, "ac": 13, "stats": {"str": 15, "dex": 10, "con": 14}, "abilities": _enemy_abilities()},
-    {"race": "Giant Rat", "hp": 6, "ac": 10, "stats": {"str": 6, "dex": 12, "con": 10}, "abilities": _enemy_abilities()},
+    {"race": "Goblin", "hp": 7, "ac": 12, "stats": {"str": 8, "dex": 14, "con": 10}, "abilities": enemy_abilities()},
+    {"race": "Skeleton", "hp": 10, "ac": 13, "stats": {"str": 10, "dex": 14, "con": 15}, "abilities": enemy_abilities()},
+    {"race": "Kobold", "hp": 5, "ac": 11, "stats": {"str": 7, "dex": 15, "con": 9}, "abilities": enemy_abilities()},
+    {"race": "Orc", "hp": 15, "ac": 13, "stats": {"str": 15, "dex": 10, "con": 14}, "abilities": enemy_abilities()},
+    {"race": "Giant Rat", "hp": 6, "ac": 10, "stats": {"str": 6, "dex": 12, "con": 10}, "abilities": enemy_abilities()},
 ]
 
 
-def _run_local_combat_demo():
+def run_local_combat_demo():
     """Local interactive combat smoke test. Calls input(); never run on import."""
-    active_enemies = [dict(e.copy(), abilities=_enemy_abilities())
+    active_enemies = [dict(e.copy(), abilities=enemy_abilities())
                        for e in [random.choice(enemy_pool) for _ in range(3)]]
 
     my_player_json = {
@@ -413,8 +376,8 @@ Rules:
 
 
 
-def _new_room(token):
-    """Build the per-room state dict with a fresh world map."""
+def new_room(token):
+    # Build the per-room state dict with a new world map
     return {
         "clients": set(),
         "client_ids": {},
@@ -427,7 +390,7 @@ def _new_room(token):
     }
 
 
-def _spawn_player(room, client_id):
+def spawn_player(room, client_id):
     """Place a new client somewhere walkable that respects the leash."""
     spawn_x, spawn_y = find_spawn_position(
         room["world_map"],
@@ -456,13 +419,13 @@ async def handle_client(websocket):
         if action == "create":
             token = data.get("token") or None
             room_id = str(uuid.uuid4())[:8]
-            room = _new_room(token)
+            room = new_room(token)
             room["clients"].add(websocket)
             room["client_ids"][websocket] = client_id
             rooms[room_id] = room
             current_room = room_id
 
-            spawn_x, spawn_y = _spawn_player(room, client_id)
+            spawn_x, spawn_y = spawn_player(room, client_id)
             await websocket.send(json.dumps({
                 "type": "room_created",
                 "room": room_id,
@@ -492,7 +455,7 @@ async def handle_client(websocket):
             room["client_ids"][websocket] = client_id
             current_room = room_id
 
-            spawn_x, spawn_y = _spawn_player(room, client_id)
+            spawn_x, spawn_y = spawn_player(room, client_id)
             await websocket.send(json.dumps({
                 "type": "joined",
                 "room": room_id,
@@ -512,13 +475,13 @@ async def handle_client(websocket):
             await websocket.send(json.dumps({"error": "First message must be 'create' or 'join'"}))
             return
 
-        # === MAIN MESSAGE LOOP ===
+        # Main message loop
         async for message in websocket:
             try:
                 data = json.loads(message)
                 action = data.get("action")
 
-                # === CREATE GAME ===
+                # Create game
                 if action == "create_game":
                     setting = data.get("setting", "a fantasy world")
                     await websocket.send(json.dumps({"type": "status", "message": "Generating new game..."}))
@@ -530,7 +493,7 @@ async def handle_client(websocket):
                             "description": description
                         }))
 
-                # === CREATE CHARACTER ===
+                # CREATE CHARACTER
                 elif action == "create_character":
                     race = data.get("race")
                     class_type = data.get("class")
@@ -555,7 +518,7 @@ async def handle_client(websocket):
                     positions = room["player_positions"]
                     if client_id not in positions:
                         # Player has no spawn record yet (shouldn't happen, but guard)
-                        spawn_x, spawn_y = _spawn_player(room, client_id)
+                        spawn_x, spawn_y = spawn_player(room, client_id)
                         await broadcast_world_state(current_room)
                         continue
 
@@ -681,8 +644,6 @@ async def start_server():
 if __name__ == "__main__":
     import sys
     if "--combat-demo" in sys.argv:
-        _run_local_combat_demo()
-    elif "--render-map" in sys.argv:
-        visualize_map(generate_complex_map())
+        run_local_combat_demo()
     else:
         asyncio.run(start_server())
